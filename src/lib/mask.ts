@@ -16,15 +16,9 @@ const RULES: Rule[] = [
   { key: "account", en: "Account", hi: "खाता", re: /(?<![\d,.])\d{9,18}(?![\d,.])/g },
 ];
 
-// Numbers labelled as accounts ("A/c No. 1234...") keep their label, like Samjho AI.
-const LABELLED_ACCOUNT = /((?:a\/c|acct?\.?|account)\s*(?:no\.?|number|#)?\s*[:\-]?\s*)\d{9,18}(?!\d)/gi;
-
 export function maskText(text: string, lang: Lang = "en"): { text: string; count: number } {
   let count = 0;
-  let out = text.replace(LABELLED_ACCOUNT, (_m, prefix: string) => {
-    count += 1;
-    return `${prefix}[${lang === "hi" ? "खाता" : "Account"}]`;
-  });
+  let out = text;
   for (const rule of RULES) {
     out = out.replace(rule.re, () => {
       count += 1;

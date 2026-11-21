@@ -5,7 +5,7 @@ import { MaskedText } from "@/components/MaskedText";
 import { TrafficLight } from "@/components/TrafficLight";
 import { cn } from "@/lib/utils";
 import type { Copy } from "@/lib/copy";
-import type { ExplainResult, RiskLevel } from "@/lib/explain-schema";
+import type { Analysis, RiskLevel } from "@/lib/explain-schema";
 import { riskStyles } from "@/lib/risk";
 
 const ICON: Record<RiskLevel, typeof OctagonAlert> = {
@@ -14,12 +14,17 @@ const ICON: Record<RiskLevel, typeof OctagonAlert> = {
   green: CheckCircle2,
 };
 
-type Result = Extract<ExplainResult, { ok: true }> & { maskedPreview: string };
-
-export function ResultView({ t, r, onReset }: { t: Copy; r: Result; onReset: () => void }) {
-  const a = r.analysis;
-  const maskedCount = r.maskedCount;
-  const finalVerdict = r.verdict;
+export function ResultView({
+  t,
+  a,
+  maskedCount,
+  onReset,
+}: {
+  t: Copy;
+  a: Analysis;
+  maskedCount: number;
+  onReset: () => void;
+}) {
   if (!a.readable) {
     return (
       <div className="paper-card mx-auto max-w-xl animate-rise p-8 text-center">
@@ -33,11 +38,10 @@ export function ResultView({ t, r, onReset }: { t: Copy; r: Result; onReset: () 
     );
   }
 
-  const v = riskStyles[finalVerdict];
+  const v = riskStyles[a.verdict];
   const hiddenTotal = Math.max(maskedCount, 0);
   const counts = { red: 0, amber: 0, green: 0 } as Record<RiskLevel, number>;
   for (const w of a.warnings) counts[w.level] += 1;
-  for (const f of r.ruleFlags) counts[f.level] += 1;
 
   async function copyQuestions() {
     const text = a.questions.map((q, i) => `${i + 1}. ${q}`).join("\n");
@@ -50,18 +54,15 @@ export function ResultView({ t, r, onReset }: { t: Copy; r: Result; onReset: () 
       {/* Verdict */}
       <section className={cn("paper-card animate-rise overflow-hidden border-l-8", v.border)}>
         <div className="flex flex-col gap-5 p-6 sm:flex-row sm:items-center sm:p-8">
-          <TrafficLight active={finalVerdict} className="self-start" />
+          <TrafficLight active={a.verdict} className="self-start" />
           <div className="flex-1">
-            <span className={cn("stamp", v.text)}>{t.verdict[finalVerdict]}</span>
+            <span className={cn("stamp", v.text)}>{t.verdict[a.verdict]}</span>
             <h2 className="mt-3 text-3xl font-semibold leading-tight sm:text-4xl">
-              <MaskedText text={a.title || t.types[a.doc_type === "other" ? "auto" : a.doc_type]} />
+              <MaskedText text={a.title} />
             </h2>
-            {a.verdict_reason && (
-              <p className="mt-2 text-lg text-muted-foreground">
-                <MaskedText text={a.verdict_reason} />
-              </p>
-            )}
-            {r.aiUnavailable && <p className="mt-2 text-sm font-medium text-risk-amber">{t.aiUnavailable}</p>}
+            <p className="mt-2 text-lg text-muted-foreground">
+              <MaskedText text={a.verdict_reason} />
+            </p>
             <div className="mt-4 flex flex-wrap gap-3 text-sm">
               {(["red", "amber", "green"] as const).map((l) => (
                 <span key={l} className="inline-flex items-center gap-1.5 font-medium">
@@ -84,49 +85,6 @@ export function ResultView({ t, r, onReset }: { t: Copy; r: Result; onReset: () 
               </span>
             ))}
           </div>
-        )}
-      </section>
-
-      {a.answer && (
-        <section className="paper-card animate-rise border-l-8 border-primary p-6">
-          <h3 className="text-xl font-semibold">{t.answerTitle}</h3>
-          <p className="mt-2 text-[1.05rem] leading-relaxed">
-            <MaskedText text={a.answer} />
-          </p>
-        </section>
-      )}
-
-      <section className="paper-card animate-rise p-6">
-        <h3 className="text-xl font-semibold">{t.ruleChecks}</h3>
-        <p className="text-sm text-muted-foreground">{t.ruleChecksHint}</p>
-        {r.ruleFlags.length === 0 ? (
-          <p className="mt-3 flex items-center gap-2 font-medium text-risk-green">
-            <CheckCircle2 className="size-5" /> {t.noRuleFlags}
-          </p>
-        ) : (
-          <ul className="mt-4 grid gap-3 md:grid-cols-2">
-            {r.ruleFlags.map((f) => {
-              const s = riskStyles[f.level];
-              const Icon = ICON[f.level];
-              return (
-                <li key={f.id} className={cn("rounded-xl border-l-4 p-4", s.soft, s.border)}>
-                  <p className="flex items-start gap-2 font-semibold leading-snug">
-                    <Icon className={cn("mt-0.5 size-5 shrink-0", s.text)} />
-                    {f.title}
-                  </p>
-                  <p className="mt-1 leading-relaxed">{f.why}</p>
-                  {f.quote && (
-                    <p className="mt-2 border-l-2 border-input pl-3 text-sm italic text-muted-foreground">
-                      “<MaskedText text={f.quote} />”
-                    </p>
-                  )}
-                  <p className="mt-2 font-semibold">
-                    {t.askPrefix} {f.ask}
-                  </p>
-                </li>
-              );
-            })}
-          </ul>
         )}
       </section>
 
@@ -161,7 +119,7 @@ export function ResultView({ t, r, onReset }: { t: Copy; r: Result; onReset: () 
 
         {/* Warnings */}
         <section className="animate-rise lg:col-span-3" style={{ animationDelay: "200ms" }}>
-          <h3 className="mb-3 text-xl font-semibold">{t.aiChecks}</h3>
+          <h3 className="mb-3 text-xl font-semibold">{t.warnings}</h3>
           <ul className="space-y-3">
             {a.warnings.map((w, i) => {
               const s = riskStyles[w.level];
@@ -218,15 +176,6 @@ export function ResultView({ t, r, onReset }: { t: Copy; r: Result; onReset: () 
             ))}
           </ol>
         </section>
-      )}
-
-      {r.maskedPreview && (
-        <details className="paper-card p-5">
-          <summary className="cursor-pointer font-semibold">{t.maskedPreview}</summary>
-          <pre className="mt-3 whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm">
-            <MaskedText text={r.maskedPreview} />
-          </pre>
-        </details>
       )}
 
       <div className="flex flex-col items-center gap-2 pt-2 text-center">
