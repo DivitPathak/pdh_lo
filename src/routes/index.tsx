@@ -8,8 +8,11 @@ import { TrafficLight } from "@/components/TrafficLight";
 import { UploadPanel } from "@/components/UploadPanel";
 import { copy } from "@/lib/copy";
 import { explainDoc } from "@/lib/explain.functions";
-import type { Analysis, DocTypeChoice } from "@/lib/explain-schema";
+import type { DocTypeChoice, ExplainResult } from "@/lib/explain-schema";
 import type { PreparedFile } from "@/lib/file-prep";
+import { maskText } from "@/lib/mask";
+import { SAMPLES, type SampleKey } from "@/lib/samples";
+import type { InputMode } from "@/components/UploadPanel";
 import type { Lang } from "@/lib/mask";
 import { riskStyles } from "@/lib/risk";
 import { cn } from "@/lib/utils";
@@ -17,13 +20,13 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Padh Lo — Understand rent, loan & insurance papers before you sign" },
+      { title: "Samjho AI — Understand rent, loan & insurance papers before you sign" },
       {
         name: "description",
         content:
-          "Upload a photo or PDF of your rent agreement, loan or insurance policy. Get a simple English or Hindi explanation, red/amber/green warnings and questions to ask. Private: nothing is stored.",
+          "Upload a photo or PDF of your rent agreement, loan or insurance policy. Get a simple English or Hindi explanation, fixed rule checks against your income, red/amber/green warnings and questions to ask. Private: nothing is stored.",
       },
-      { property: "og:title", content: "Padh Lo — Read it before you sign it" },
+      { property: "og:title", content: "Samjho AI — Understand it before you sign it" },
       {
         property: "og:description",
         content: "Simple English or Hindi explanations of rent, loan and insurance documents, with red/amber/green warnings.",
@@ -40,22 +43,50 @@ function Index() {
   const [docType, setDocType] = useState<DocTypeChoice>("auto");
   const [files, setFiles] = useState<PreparedFile[]>([]);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{ analysis: Analysis; maskedCount: number } | null>(null);
+  const [mode, setMode] = useState<InputMode>("files");
+  const [text, setText] = useState("");
+  const [income, setIncome] = useState("");
+  const [emi, setEmi] = useState("");
+  const [question, setQuestion] = useState("");
+  const [result, setResult] = useState<
+    (Extract<ExplainResult, { ok: true }> & { maskedPreview: string }) | null
+  >(null);
   const explain = useServerFn(explainDoc);
   const t = copy[lang];
 
   const showError = (key: string) => toast.error(t.errors[key] ?? t.errors["failed"]);
 
+  function loadSample(k: SampleKey) {
+    const s = SAMPLES[k];
+    setText(s.text);
+    setIncome(String(s.income));
+    setEmi(s.emi ? String(s.emi) : "");
+    setDocType("auto");
+  }
+
   async function submit() {
-    if (files.length === 0) return;
+    const useText = mode === "text";
+    if (useText && text.trim().length < 30) return showError("short");
+    if (!useText && files.length === 0) return;
+    // Pasted text is masked here, before it ever leaves the device.
+    const masked = useText ? maskText(text, lang).text : "";
     setLoading(true);
     try {
       const res = await explain({
-        data: { language: lang, docType, files: files.map((f) => ({ mime: f.mime, dataUrl: f.dataUrl })) },
+        data: {
+          language: lang,
+          docType,
+          income: Number(income) || 0,
+          emi: Number(emi) || 0,
+          question: question.trim(),
+          text: masked,
+          files: useText ? [] : files.map((f) => ({ mime: f.mime, dataUrl: f.dataUrl })),
+        },
       });
       if (res.ok) {
-        setResult({ analysis: res.analysis, maskedCount: res.maskedCount });
+        setResult({ ...res, maskedPreview: masked });
         setFiles([]); // drop the document from memory once explained
+        setText("");
         window.scrollTo({ top: 0, behavior: "smooth" });
       } else showError(res.error);
     } catch {
@@ -68,6 +99,8 @@ function Index() {
   function reset() {
     setResult(null);
     setFiles([]);
+    setText("");
+    setQuestion("");
     setDocType("auto");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -79,8 +112,8 @@ function Index() {
           <button type="button" onClick={reset} className="flex items-center gap-2.5 text-left">
             <TrafficLight className="scale-[0.55] -my-4 -mx-1.5" />
             <span className="leading-none">
-              <span className="block font-display text-2xl font-bold tracking-tight">Padh Lo</span>
-              <span className="block text-xs text-muted-foreground">पढ़ लो · {t.tagline}</span>
+              <span className="block font-display text-2xl font-bold tracking-tight">Samjho AI</span>
+              <span className="block text-xs text-muted-foreground">समझो · {t.tagline}</span>
             </span>
           </button>
           <div role="radiogroup" aria-label="Language" className="flex rounded-full border bg-card p-1 text-sm">
@@ -105,7 +138,7 @@ function Index() {
 
       <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
         {result ? (
-          <ResultView t={t} a={result.analysis} maskedCount={result.maskedCount} onReset={reset} />
+          <ResultView t={t} r={result} onReset={reset} />
         ) : (
           <div className="grid items-start gap-10 lg:grid-cols-[1fr_1.1fr] lg:gap-14">
             <section className="animate-rise lg:sticky lg:top-10">
@@ -137,6 +170,17 @@ function Index() {
                 t={t}
                 lang={lang}
                 onLang={setLang}
+                mode={mode}
+                onMode={setMode}
+                text={text}
+                onText={setText}
+                onSample={loadSample}
+                income={income}
+                onIncome={setIncome}
+                emi={emi}
+                onEmi={setEmi}
+                question={question}
+                onQuestion={setQuestion}
                 files={files}
                 onFiles={setFiles}
                 docType={docType}
