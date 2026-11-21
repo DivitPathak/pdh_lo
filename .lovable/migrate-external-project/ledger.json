@@ -1,0 +1,18 @@
+{
+  "source": "code-archive: samjho-ai.zip (FastAPI + Tesseract OCR + Ollama, static HTML pages)",
+  "target": "Merge into existing Padh Lo TanStack app",
+  "capabilities": [
+    {"capability": "code: masking (Aadhaar, PAN, phone, email, labelled account)", "source": "rules.py / docs/rules.js mask()", "outcome": "migrate into src/lib/mask.ts (labelled-account rule added)", "status": "pending", "next_action": "port + tests"},
+    {"capability": "code: document type detection", "source": "rules.py doc_type()", "outcome": "port to src/lib/rules.ts", "status": "pending", "next_action": "port + tests"},
+    {"capability": "code: rules engine (rent %, deposit > 2 months, refund deadline, lock-in, hike, prepay, floating, fees, EMI %, exclusions, waiting, co-pay, low cover)", "source": "rules.py check()/verdict()", "outcome": "port to src/lib/rules.ts with English + Hindi texts", "status": "pending", "next_action": "port + tests from test_rules.py and test_demo.js"},
+    {"capability": "inputs: monthly income, existing EMIs, optional question, language", "source": "static/index.html form", "outcome": "add to upload panel", "status": "pending", "next_action": "build UI"},
+    {"capability": "demo: sample documents + paste text, masked text preview", "source": "docs/ GitHub Pages demo", "outcome": "add paste-text mode with samples; show masked text the AI saw", "status": "pending", "next_action": "build UI"},
+    {"capability": "OCR (Tesseract eng+hin, pdf text, poppler)", "source": "main.py read_text()", "outcome": "replaced by AI vision reading of photo/PDF (returns masked transcript for rules)", "status": "pending", "next_action": "extend server function"},
+    {"capability": "AI explanation (Ollama qwen2.5)", "source": "main.py explain()", "outcome": "replaced by Lovable AI Gateway (already used); rule texts are the fallback when AI fails", "status": "pending", "next_action": "extend server function"},
+    {"capability": "public endpoint POST /api/analyze", "source": "main.py", "outcome": "replaced by internal server function; no external callers documented (only the bundled pages)", "status": "accepted", "next_action": "none"},
+    {"capability": "database / users / records", "source": "none", "outcome": "not applicable (source stores nothing)", "status": "accepted", "next_action": "none"},
+    {"capability": "secrets: OLLAMA_URL, OLLAMA_MODEL, ALLOWED_ORIGINS", "source": "env vars", "outcome": "platform/runtime config of replaced local AI and CORS; not needed", "status": "accepted", "next_action": "none"},
+    {"capability": "security headers / no-store", "source": "main.py middleware", "outcome": "nothing persisted; server function responses not cached", "status": "accepted", "next_action": "none"},
+    {"capability": "verification", "source": "-", "outcome": "tests + browser run of upload, paste and sample flows", "status": "pending", "next_action": "verify"}
+  ]
+}

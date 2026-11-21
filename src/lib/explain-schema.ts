@@ -9,9 +9,18 @@ export type DocTypeChoice = z.infer<typeof docTypeChoice>;
 export const MAX_FILES = 5;
 export const MAX_FILE_CHARS = 14_000_000; // ~10 MB once base64-encoded
 
-export const explainInput = z.object({
+export const MAX_TEXT_CHARS = 20_000;
+const money = z.number().int().min(0).max(1_000_000_000);
+
+export const explainInput = z
+  .object({
   language: z.enum(["en", "hi"]),
   docType: docTypeChoice,
+  income: money,
+  emi: money,
+  question: z.string().max(500),
+  /** Pasted document text, already masked in the browser. Empty when files are sent. */
+  text: z.string().max(MAX_TEXT_CHARS),
   files: z
     .array(
       z.object({
@@ -22,9 +31,11 @@ export const explainInput = z.object({
           .regex(/^data:(image\/(jpeg|png|webp)|application\/pdf);base64,/),
       }),
     )
-    .min(1)
     .max(MAX_FILES),
-});
+  })
+  .refine((d) => (d.files.length > 0) !== (d.text.trim().length >= 30), {
+    message: "Send either files or at least 30 characters of text",
+  });
 export type ExplainInput = z.infer<typeof explainInput>;
 
 export const analysis = z.object({
@@ -41,11 +52,32 @@ export const analysis = z.object({
   ),
   questions: z.array(z.string()),
   masked_types: z.array(z.string()),
+  answer: z.string(),
+  transcript: z.string(),
 });
 export type Analysis = z.infer<typeof analysis>;
 
+export type RuleFlagDTO = {
+  id: string;
+  level: z.infer<typeof riskLevel>;
+  title: string;
+  why: string;
+  ask: string;
+  quote: string;
+};
+
 export type ExplainResult =
-  | { ok: true; analysis: Analysis; maskedCount: number }
+  | {
+      ok: true;
+      /** AI explanation without the transcript (that stays on the server). */
+      analysis: Omit<Analysis, "transcript">;
+      ruleFlags: RuleFlagDTO[];
+      /** Final light: the most severe of the rule checks and the AI review. */
+      verdict: z.infer<typeof riskLevel>;
+      maskedCount: number;
+      /** True when the AI was unavailable and only the fixed rules ran (pasted text only). */
+      aiUnavailable: boolean;
+    }
   | { ok: false; error: string };
 
 const str = { type: "string" } as const;
@@ -66,6 +98,8 @@ export const analysisJsonSchema = {
     "warnings",
     "questions",
     "masked_types",
+    "answer",
+    "transcript",
   ],
   properties: {
     readable: { type: "boolean" },
@@ -95,5 +129,7 @@ export const analysisJsonSchema = {
     },
     questions: { type: "array", items: str },
     masked_types: { type: "array", items: str },
+    answer: str,
+    transcript: str,
   },
 } as const;
