@@ -28,3 +28,8 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## Project rules
+- Document analysis runs only in a TanStack server function (`src/lib/explain.functions.ts` → `explain.server.ts`) via the Lovable AI Gateway SDK with a zero-retention model; why: the app promises nothing is stored, so no database, storage, or content logging is used.
+- Every AI answer passes through `maskDeep` (`src/lib/mask.ts`) before reaching the browser; why: the model prompt masks personal data, and regex masking is the second safety net.
+- UI text lives in `src/lib/copy.ts` with matching `en` and `hi` keys; why: the whole interface switches language together with the answer.
